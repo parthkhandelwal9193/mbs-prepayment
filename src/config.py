@@ -1,0 +1,7 @@
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+RAW = ROOT / "data" / "raw"
+PROCESSED = ROOT / "data" / "processed"
+FIGURES = ROOT / "outputs" / "figures"
+MODELS = ROOT / "outputs" / "models"

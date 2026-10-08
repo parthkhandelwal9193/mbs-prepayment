@@ -1,0 +1,9 @@
+data/raw/
+data/processed/
+outputs/models/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+*.zip
+*.txt
+.DS_Store
