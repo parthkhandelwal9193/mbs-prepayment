@@ -1,9 +1,19 @@
-data/raw/
-data/processed/
-outputs/models/
+# Python
 .venv/
 __pycache__/
+*.py[cod]
 .ipynb_checkpoints/
+
+# Data and downloaded files
+data/raw/
+data/processed/
 *.zip
-*.txt
+
+# Generated model files
+outputs/models/
+
+# Operating-system files
 .DS_Store
+
+# Secrets
+.env
