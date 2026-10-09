@@ -10,7 +10,7 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 ORIG_COLUMNS = [
     "credit_score",
     "first_payment_date",
-    "first_time_homebuyer",
+    "first_time_homebuyer_flag",
     "maturity_date",
     "msa",
     "mi_percent",
@@ -22,7 +22,8 @@ ORIG_COLUMNS = [
     "original_ltv",
     "original_interest_rate",
     "channel",
-    "prepayment_penalty",
+    "prepayment_penalty_mortgage_flag",
+    "amortization_type",
     "property_state",
     "property_type",
     "postal_code",
@@ -33,6 +34,11 @@ ORIG_COLUMNS = [
     "seller_name",
     "servicer_name",
     "super_conforming_flag",
+    "pre_harp_loan_sequence_number",
+    "program_indicator",
+    "harp_indicator",
+    "property_valuation_method",
+    "interest_only_indicator",
 ]
 
 PERF_COLUMNS = [
@@ -66,16 +72,35 @@ PERF_COLUMNS = [
     "delinquent_accrued_interest",
     "delinquency_due_to_disaster",
     "borrower_assistance_status_code",
+    "current_month_modification_cost",
+    "interest_bearing_upb",
+    "extra_field_33",
+    "extra_field_34",
+    "extra_field_35",
 ]
 
+print("Origination column names:", len(ORIG_COLUMNS))
+print("Performance column names:", len(PERF_COLUMNS))
+
+assert len(ORIG_COLUMNS) == 31
+assert len(PERF_COLUMNS) == 35
+
+print("Origination column names:", len(ORIG_COLUMNS))
+print("Performance column names:", len(PERF_COLUMNS))
+
+assert len(ORIG_COLUMNS) == 31
+assert len(PERF_COLUMNS) == 35
 
 def read_pipe_file(path, columns):
+
+    
     df = pd.read_csv(
         path,
         sep="|",
         header=None,
         names=columns,
         dtype="string",
+        
     )
 
     if df.shape[1] != len(columns):
@@ -83,6 +108,7 @@ def read_pipe_file(path, columns):
             f"{path} has {df.shape[1]} columns, "
             f"but the loader expects {len(columns)}"
         )
+    
 
     return df
 
