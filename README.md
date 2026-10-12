@@ -4,6 +4,26 @@ This project uses Freddie Mac loan-level performance data to study mortgage prep
 
 The analysis focuses on a practical question: how does the relationship between refinance incentive and prepayment change across market regimes, and what does that imply for principal timing and interest-rate risk?
 
+> **Valuation results are illustrative scenarios—not market-calibrated prices, an OAS valuation, or investment advice.** They depend on the hypothetical pool, fixed coupon and discount-yield assumptions, empirical prepayment curves, and simplified parallel rate shocks described below and in the valuation scripts.
+
+## Results
+
+### Empirical prepayment curves
+
+![Empirical prepayment S-curves by period](outputs/figures_final/fig1_s_curves.png)
+
+### Price sensitivity to rate shocks
+
+![Illustrative price versus rate shock](outputs/figures_final/fig2_price_vs_rate_shock.png)
+
+### Weighted-average life sensitivity
+
+![Illustrative WAL versus rate shock](outputs/figures_final/fig3_wal_vs_rate_shock.png)
+
+### Duration and convexity
+
+![Illustrative duration and convexity](outputs/figures_final/fig4_duration_convexity.png)
+
 ## Project workflow
 
 1. **Data preparation** — Load Freddie Mac loan-level performance data and mortgage-rate data.
@@ -15,13 +35,35 @@ The analysis focuses on a practical question: how does the relationship between 
 7. **Cash-flow projection** — Convert CPR assumptions to monthly SMM and project scheduled principal, prepayments, and interest.
 8. **Rate-shock scenarios** — Reprice the illustrative pool under parallel rate shocks and calculate WAL, effective duration, and convexity.
 
-## Data and target
+## Data
 
-The project uses Freddie Mac Single-Family Loan-Level Dataset performance records. The processed panel contains loan-month observations, loan characteristics, market-rate features, and a binary event label.
+### Freddie Mac loan-level performance data
+
+The project uses the Freddie Mac Single-Family Loan-Level Dataset. Freddie Mac provides the data through Clarity Data Intelligence; registration and sign-in are required to access the download page. Review Freddie Mac's current terms and conditions before using or redistributing the data.
+
+- [Freddie Mac Single-Family Loan-Level Dataset](https://www.freddiemac.com/research/datasets/sf-loanlevel-dataset)
+
+### Mortgage-rate data
+
+The project also uses Freddie Mac's Primary Mortgage Market Survey (PMMS) mortgage-rate data.
+
+- [Freddie Mac PMMS archive](https://www.freddiemac.com/pmms/pmms_archives)
+
+Download the historical series needed by the preparation scripts. The exact file, columns, and date coverage should match the inputs expected by `src/prepare_pmms.py`.
+
+### Local data files
+
+Raw source data are not included in this repository. Place downloaded files in the local paths expected by the scripts, under `data/raw/` where applicable. Check the input paths in each script before running; filenames and directory layouts from data providers can change.
+
+Do not commit downloaded raw data unless you have verified that redistribution is allowed and that the files contain no restricted or sensitive information.
+
+## Data and target definitions
+
+The processed panel contains loan-month observations, loan characteristics, market-rate features, and a binary event label.
 
 The current event label is based on zero-balance code `01`, which Freddie Mac defines as a prepaid or matured voluntary payoff. The model experiments include both the existing event definition and a separately constructed next-month payoff target. These are different prediction targets, so their metrics should not be compared as if they measured the same task.
 
-Rate incentive is defined as the borrower’s mortgage rate relative to the prevailing market mortgage rate. Positive incentive indicates a potential rate saving from refinancing; negative incentive indicates that refinancing at the market rate is not financially attractive.
+Rate incentive is defined as the borrower's mortgage rate relative to the prevailing market mortgage rate. Positive incentive indicates a potential rate saving from refinancing; negative incentive indicates that refinancing at the market rate is not financially attractive.
 
 ## Modeling and evaluation
 
@@ -46,9 +88,13 @@ For each market period, the project calculates balance-weighted monthly payoff r
 
 The 2023–2024 curve is flatter than the 2018–2021 curve over much of the positive-incentive range. This pattern is consistent with a lower observed refinance response during the rate-lock-in period. It does not, by itself, establish that borrower preferences changed: period differences may also reflect burnout, borrower composition, seasoning, market conditions, and data limitations. Thin incentive buckets are excluded from plotted curves to reduce the influence of noisy estimates.
 
-## Illustrative cash-flow and rate-risk scenarios
+## Illustrative valuation assumptions
+
+> **Important interpretation:** The valuation outputs are scenario-analysis results for a hypothetical pass-through pool. They are not observed security prices, a market quote, a market-calibrated valuation, an OAS analysis, or an investment recommendation.
 
 The empirical curves are used to assign CPR assumptions under parallel rate shocks. CPR is converted to SMM, and the assumed prepayment speed is applied to a hypothetical pass-through pool to project monthly principal and interest cash flows. The analysis then calculates price per 100, weighted-average life, effective duration, and effective convexity.
+
+The results depend on the assumptions and conventions encoded in `valuation_baseline.py`, `valuation_empirical.py`, and the figure-generation scripts. In particular, the cash-flow engine uses a hypothetical pool, fixed coupon and discount-yield assumptions, empirical bucket-level CPR relationships, and simplified parallel rate shifts. Review those scripts before interpreting or reproducing the figures; do not treat their outputs as market-calibrated values.
 
 For the 2023–2024 empirical curve, the `±100 bp` scenario produced:
 
@@ -58,9 +104,7 @@ For the 2023–2024 empirical curve, the `±100 bp` scenario produced:
 | Base case | 6.40% | 100.00 | 10.00 years |
 | Rates +100 bp | 3.97% | 91.98 | 12.42 years |
 
-At this shock size, the illustrative pool’s effective duration is 6.07 years and its effective convexity is −3.89 under the convention used in the code.
-
-These are scenario-analysis results, not market-calibrated valuations. The cash-flow engine uses a hypothetical pool, fixed coupon and discount-yield assumptions, a simplified parallel rate shift, and empirical bucket-level CPR relationships. It is not an option-adjusted-spread model and should not be interpreted as a quoted market price or investment recommendation.
+At this shock size, the illustrative pool's effective duration is 6.07 years and its effective convexity is −3.89 under the convention used in the code. These figures describe this model setup only; they should not be generalized to a traded MBS or security.
 
 ## Main findings
 
@@ -73,28 +117,79 @@ These are scenario-analysis results, not market-calibrated valuations. The cash-
 ## Repository structure
 
 ```text
-data/
-  raw/                 # Source files; not committed
-  processed/           # Processed panels and development samples
-src/                   # Data preparation, features, and model scripts
-notebooks/             # Exploration and analysis
-outputs/
-  models/              # Saved models and metric tables
-  predictions/         # Loan-month predictions
-  valuation_baseline/  # Empirical curves, cash flows, and scenario tables
-  figures_final/       # Final charts and chart data
+.
+├── data/
+│   ├── raw/                 # Downloaded source data; not committed
+│   └── processed/           # Processed panels and development samples
+├── src/                     # Data preparation, features, and model scripts
+├── outputs/
+│   ├── figures_final/        # Final charts and chart data
+│   ├── models/               # Saved models and metric tables, if generated
+│   ├── predictions/          # Loan-month predictions, if generated
+│   └── valuation_baseline/  # Empirical curves, cash flows, and scenario tables
+├── make_final_figures.py
+├── valuation_baseline.py
+└── valuation_empirical.py
 ```
 
-## Reproducibility
+Some directories shown above are created when running the workflow and may not be present in a fresh clone.
 
-Create and activate a Python environment, install the dependencies in `requirements.txt`, and run the project scripts from the repository root. Raw Freddie Mac files and other source data are not included in the repository; place them in the expected `data/raw/` location before rebuilding processed outputs.
+## Reproducing the analysis
 
-The scripts use separate filenames for experimental models and outputs so that new experiments do not overwrite the original benchmark artifacts.
+Run commands from the repository root. The dataset is not bundled with this repository, and exact input filenames and paths depend on the downloaded files and the settings in the scripts. Inspect each script's input/output path configuration before running.
 
-## Limitations and next steps
+1. Clone the repository and change into its directory:
+
+   ```bash
+   git clone https://github.com/parthkhandelwal9193/mbs-prepayment.git
+   cd mbs-prepayment
+   ```
+
+2. Create and activate a Python virtual environment:
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. Install the project's dependencies. If a `requirements.txt` is present:
+
+   ```bash
+   python -m pip install --upgrade pip
+   python -m pip install -r requirements.txt
+   ```
+
+   If no dependency file is present, inspect the imports in the scripts and install the required packages in the environment. Do not assume that a fresh environment is reproducible until the dependencies have been recorded.
+
+4. Download the Freddie Mac loan-level data and PMMS rates from the official links above. Place the files in the paths expected by the preparation scripts; raw data are not included in this repository.
+
+5. Run the preparation, feature, and modeling scripts in the order required by their inputs. The exact sequence and command-line arguments are script-specific; inspect each script's `main` block and path settings. The core scripts include:
+
+   ```text
+   src/prepare_pmms.py
+   src/build_panel.py
+   src/add_rate_features.py
+   src/build_hazard_sample.py
+   src/validate_features.py
+   src/train_xgboost_hazard.py
+   ```
+
+6. Run the valuation scripts and figure-generation script only after their expected input files have been created:
+
+   ```bash
+   python valuation_baseline.py
+   python valuation_empirical.py
+   python make_final_figures.py
+   ```
+
+   These commands assume the scripts use repository-relative paths and that all required inputs exist. Check each script before running; adjust commands if it requires arguments or different paths.
+
+7. Compare regenerated outputs with the committed figures and tables. Model results can vary if source data, package versions, script settings, or random seeds differ.
+
+## Limitations
 
 - The public loan-level data do not contain all household, property-market, or servicing information that can drive turnover-related payoffs.
 - Zero-balance code `01` includes prepaid or matured voluntary payoffs; it is not a pure refinance label.
 - The observed incentive-bucket curves combine loans with different characteristics and are not fully adjusted for borrower mix or loan seasoning.
 - The cash-flow engine is illustrative and is not calibrated to a specific traded security, market curve, spread, or OAS.
-- A production valuation model would require better pool/security specification, market-consistent rate scenarios, validated prepayment forecasts, and benchmarking against observed security prices or market analytics.
+- A production valuation model would require a more complete pool/security specification, market-consistent rate scenarios, validated prepayment forecasts, and benchmarking against observed security prices or market analytics.
