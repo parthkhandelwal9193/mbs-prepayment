@@ -160,11 +160,7 @@ servicing/performance fields, market-rate features, and event labels.
 Refinance incentive is:
 
 \[
-\text{Refinance incentive}
-=
-\text{borrower note rate}
--
-\text{prevailing PMMS mortgage rate}.
+Refinance incentive = borrower note rate − prevailing PMMS mortgage rate.
 \]
 
 A positive value indicates a potential rate-saving incentive to refinance.
