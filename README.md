@@ -1,16 +1,46 @@
 # Agency MBS Prepayment and Rate-Risk Analysis
 
-This project uses Freddie Mac loan-level performance data to study mortgage prepayments and their effect on agency mortgage-backed securities (MBS). It builds a monthly loan-performance panel, estimates prepayment behavior, and translates observed incentive–prepayment relationships into cash-flow and rate-shock scenarios.
+This project uses Freddie Mac loan-level performance data and Freddie Mac
+Primary Mortgage Market Survey (PMMS) mortgage rates to study mortgage
+prepayments and their implications for agency mortgage-backed securities
+(MBS).
 
-The analysis focuses on a practical question: how does the relationship between refinance incentive and prepayment change across market regimes, and what does that imply for principal timing and interest-rate risk?
+It combines two complementary approaches:
 
-> **Valuation results are illustrative scenarios—not market-calibrated prices, an OAS valuation, or investment advice.** They depend on the hypothetical pool, fixed coupon and discount-yield assumptions, empirical prepayment curves, and simplified parallel rate shocks described below and in the valuation scripts.
+1. **Empirical prepayment-curve valuation** — estimates observed
+   refinance-incentive/payoff relationships across market regimes and
+   translates them into illustrative MBS cash-flow, price, weighted-average
+   life (WAL), duration, and convexity scenarios.
+2. **Loan-level XGBoost payoff-risk modeling** — predicts one-month full
+   voluntary payoff risk, evaluates performance out of time, compares
+   predicted and realized payoff UPB, and tests rate-linked sensitivity within
+   observed feature support.
+
+The central question is:
+
+> How does refinance incentive affect mortgage payoff behavior across market
+> regimes, what does a loan-level machine-learning model add to the analysis,
+> and what does that imply for MBS principal timing and interest-rate risk?
+
+> **Important:** All valuation outputs are illustrative scenarios, not
+> market-calibrated security prices, OAS valuations, investment advice, or
+> recommendations. Pool-level price, WAL, duration, and convexity outputs use
+> empirical prepayment curves, a hypothetical pass-through pool, fixed coupon
+> and discount-yield assumptions, and simplified parallel rate shocks.
+> XGBoost is used for loan-level full-voluntary-payoff prediction, forecast
+> diagnostics, and bounded rate-sensitivity analysis; it is not the primary
+> pool-level valuation input.
 
 ## Results
 
-### Empirical prepayment curves
+### Empirical prepayment S-curves
 
 ![Empirical prepayment S-curves by period](outputs/figures_final/fig1_s_curves.png)
+
+The balance-weighted empirical curves show that observed payoff speeds generally
+rise with refinance incentive. The relationship differs across market periods,
+consistent with changing rate environments, seasoning, burnout, borrower
+composition, and mortgage-rate lock-in effects.
 
 ### Price sensitivity to rate shocks
 
@@ -20,161 +50,369 @@ The analysis focuses on a practical question: how does the relationship between 
 
 ![Illustrative WAL versus rate shock](outputs/figures_final/fig3_wal_vs_rate_shock.png)
 
-### Duration and convexity
+### Empirical duration and convexity
 
 ![Illustrative duration and convexity](outputs/figures_final/fig4_duration_convexity.png)
 
+These price, WAL, duration, and convexity figures come from the empirical
+prepayment-curve cash-flow framework. They are not calculated from XGBoost
+probabilities.
+
+### XGBoost calibration by predicted-risk decile
+
+![Test-set calibration by predicted-risk decile](outputs/figures_final/fig5_test_calibration_deciles.png)
+
+The calibration chart compares predicted with observed full-voluntary-payoff
+rates across equal-count test-set risk deciles. Isotonic calibration moves the
+scores closer to observed event rates, though calibration remains
+period-dependent.
+
+### Predicted versus realized payoff-UPB rate
+
+![Predicted versus realized full-payoff UPB rate](outputs/figures_final/fig6_monthly_payoff_upb_diagnostic.png)
+
+The monthly diagnostic compares realized full-payoff UPB with predicted
+full-payoff probability multiplied by beginning UPB. It makes aggregate
+forecast bias and month-to-month variation visible in both the test and
+holdout periods.
+
+### XGBoost rate sensitivity and feature support
+
+![XGBoost rate sensitivity and feature support](outputs/figures_final/fig7_xgb_sensitivity_support.png)
+
+The XGBoost model produces the expected directional response to refinance
+incentive: falling market rates increase predicted full-payoff risk, while
+rising market rates reduce it. The second panel reports the share of loans and
+UPB whose scenario input remains within the model's 2018–2021 training range.
+
+## Key findings
+
+- Observed payoff speed generally rises with refinance incentive, but the
+  relationship changes across market regimes.
+- The 2023–2024 empirical curve is flatter than the 2018–2021 curve over much
+  of the positive-incentive range, consistent with a rate-lock-in environment
+  and changing loan/borrower composition.
+- The empirical valuation produces effective duration between approximately
+  5.0 and 6.1 years across the evaluated periods and negative convexity in
+  every period.
+- For the 2023–2024 empirical curve, a 100 bp rate rally increases assumed
+  payoff speed, shortens WAL, and raises illustrative price; a 100 bp rate
+  selloff reduces payoff speed, extends WAL, and lowers price.
+- XGBoost provides a validated loan-level payoff-risk signal: holdout ROC-AUC
+  is 0.6588, and holdout predicted payoff dollars equal 1.081x realized payoff
+  dollars.
+- XGBoost payoff probabilities move directionally with PMMS-linked refinance
+  incentive shocks, but feature support declines under higher-rate scenarios.
+  The empirical curve remains the primary input to pool-level valuation.
+
 ## Project workflow
 
-1. **Data preparation** — Load Freddie Mac loan-level performance data and mortgage-rate data.
-2. **Panel construction** — Build a monthly loan-level panel and identify voluntary payoff events.
-3. **Feature engineering** — Construct refinance incentive, loan seasoning, burnout, and calendar features.
-4. **Hazard modeling** — Train logistic-regression and XGBoost models to estimate loan-month payoff risk.
-5. **Temporal evaluation** — Evaluate on chronological splits rather than random loan-month splits.
-6. **Prepayment analysis** — Estimate balance-weighted CPR by refinance-incentive bucket and compare curves across periods.
-7. **Cash-flow projection** — Convert CPR assumptions to monthly SMM and project scheduled principal, prepayments, and interest.
-8. **Rate-shock scenarios** — Reprice the illustrative pool under parallel rate shocks and calculate WAL, effective duration, and convexity.
+1. **Data preparation** — Load Freddie Mac loan-level performance records and
+   historical PMMS mortgage rates.
+2. **Panel construction** — Build a monthly loan-level panel and identify
+   voluntary payoff events.
+3. **Feature engineering** — Construct refinance incentive, seasoning,
+   burnout, calendar, lagged loan, and categorical features.
+4. **Hazard modeling** — Train logistic-regression and XGBoost models for
+   loan-month full-voluntary-payoff risk.
+5. **Temporal evaluation** — Use chronological train, validation, test, and
+   holdout partitions instead of random loan-month splits.
+6. **Empirical prepayment analysis** — Estimate balance-weighted payoff rates
+   by refinance-incentive bucket and annualize them into CPR-style assumptions.
+7. **Illustrative cash-flow valuation** — Convert empirical annualized payoff
+   assumptions to monthly SMM and project scheduled principal, prepayments,
+   interest, price, WAL, duration, and convexity.
+8. **XGBoost validation and model-risk checks** — Evaluate discrimination,
+   calibration, payoff-UPB forecasts, base-score reproducibility, PMMS-shock
+   sensitivity, and feature support.
 
 ## Data
 
 ### Freddie Mac loan-level performance data
 
-The project uses the Freddie Mac Single-Family Loan-Level Dataset. Freddie Mac provides the data through Clarity Data Intelligence; registration and sign-in are required to access the download page. Review Freddie Mac's current terms and conditions before using or redistributing the data.
+The project uses the
+[Freddie Mac Single-Family Loan-Level Dataset](https://www.freddiemac.com/research/datasets/sf-loanlevel-dataset).
+Freddie Mac provides loan-level origination and monthly performance data through
+its research-data platform; registration and current data terms apply.
 
-- [Freddie Mac Single-Family Loan-Level Dataset](https://www.freddiemac.com/research/datasets/sf-loanlevel-dataset)
+Raw source data are not included in this repository. Download data directly
+from Freddie Mac and place it in the local locations expected by the scripts,
+typically under `data/raw/`.
+
+Do not commit raw downloaded data unless redistribution is permitted and the
+files have been reviewed for restrictions.
 
 ### Mortgage-rate data
 
-The project also uses Freddie Mac's Primary Mortgage Market Survey (PMMS) mortgage-rate data.
-
-- [Freddie Mac PMMS archive](https://www.freddiemac.com/pmms/pmms_archives)
-
-Download the historical series needed by the preparation scripts. The exact file, columns, and date coverage should match the inputs expected by `src/prepare_pmms.py`.
-
-### Local data files
-
-Raw source data are not included in this repository. Place downloaded files in the local paths expected by the scripts, under `data/raw/` where applicable. Check the input paths in each script before running; filenames and directory layouts from data providers can change.
-
-Do not commit downloaded raw data unless you have verified that redistribution is allowed and that the files contain no restricted or sensitive information.
+The project uses historical
+[Freddie Mac PMMS mortgage-rate data](https://www.freddiemac.com/pmms/pmms_archives)
+to construct refinance incentive. Download the series required by
+`src/prepare_pmms.py`, ensuring its dates and columns match the preparation
+script.
 
 ## Data and target definitions
 
-The processed panel contains loan-month observations, loan characteristics, market-rate features, and a binary event label.
+The processed dataset is a loan-month panel containing loan characteristics,
+servicing/performance fields, market-rate features, and event labels.
 
-The current event label is based on zero-balance code `01`, which Freddie Mac defines as a prepaid or matured voluntary payoff. The model experiments include both the existing event definition and a separately constructed next-month payoff target. These are different prediction targets, so their metrics should not be compared as if they measured the same task.
+### Refinance incentive
 
-Rate incentive is defined as the borrower's mortgage rate relative to the prevailing market mortgage rate. Positive incentive indicates a potential rate saving from refinancing; negative incentive indicates that refinancing at the market rate is not financially attractive.
+Refinance incentive is:
+
+\[
+\text{Refinance incentive}
+=
+\text{borrower note rate}
+-
+\text{prevailing PMMS mortgage rate}.
+\]
+
+A positive value indicates a potential rate-saving incentive to refinance.
+A negative value indicates that replacing the loan at prevailing market rates
+is generally less attractive on rate alone.
+
+### Full-voluntary-payoff target
+
+The XGBoost event is based on Freddie Mac zero-balance code `01`:
+**“Prepaid or Matured (Voluntary Payoff).”** It is a full-loan termination
+event, not a pure-refinance label and not a measure of all principal
+reductions. Freddie Mac’s user guide identifies zero-balance code `01` as a
+voluntary payoff event. [Freddie Mac user-guide mirror](https://usermanual.wiki/Document/userguide.343559074.pdf)
+
+This distinction matters:
+
+- **XGBoost target:** one-month probability of full voluntary payoff.
+- **Empirical valuation input:** balance-weighted payoff behavior transformed
+  into a CPR-style annualized assumption for illustrative cash flows.
+- **Total CPR:** a broader pool-level convention that should not be assumed
+  equivalent to a full-payoff event probability.
 
 ## Modeling and evaluation
 
-The loan-level models use chronological partitions:
+The project uses chronological partitions to avoid random time leakage:
 
-| Partition | Period |
-|---|---|
-| Train | 2018–2021 |
-| Validation | 2022 |
-| Test | 2023–2024 |
-| Holdout | 2025–2026 |
+| Partition | Period | Primary use |
+|---|---|---|
+| Train | 2018–2021 | Feature/model estimation and internal tuning |
+| Validation | 2022 | Probability calibration |
+| Test | 2023–2024 | Out-of-time evaluation |
+| Holdout | 2025–2026 | Later-period robustness evaluation |
 
-The validation period is used for model selection and probability calibration. The later test and holdout periods are used to examine out-of-time performance. Because the data are a loan-month panel, preserving chronology is important: random splits could place observations from different market periods into both training and evaluation sets.
+Chronological evaluation is important because a random loan-month split can
+mix observations from different mortgage-rate regimes across training and
+evaluation data.
 
-Model performance is reported using ranking and probability metrics, including ROC-AUC, average precision, Brier score, and log loss. The 2023–2024 test period showed materially weaker loan-level ranking than the training period. This is consistent with a change in the distribution of refinance incentives: most test-period loan-months were deeply out of the money, leaving refinance incentive with less power to distinguish which individual borrowers would prepay. Public loan-level features also do not capture many household-level reasons for moving or paying off a mortgage.
+Model evaluation includes:
 
-Probability calibration reduced some aggregate overprediction but did not eliminate it in the 2023–2024 period. The saved current-event model probabilities and the separately constructed next-month payoff target have different timing definitions; comparisons between them are diagnostic, not a like-for-like forecast validation.
+- ROC-AUC and average precision for ranking quality
+- Brier score and log loss for probability quality
+- Calibration-by-decile diagnostics
+- UPB-weighted predicted-versus-realized payoff diagnostics
+
+## XGBoost payoff-risk results
+
+The XGBoost model estimates a one-month probability of full voluntary payoff.
+It is a loan-level classification model, not a direct total-CPR model and not
+a standalone market-calibrated MBS valuation engine.
+
+| Split | Rows | Events | ROC-AUC | Average precision | Brier score | Log loss |
+|---|---:|---:|---:|---:|---:|---:|
+| Test, 2023–2024 | 1,389,985 | 6,723 | 0.5801 | 0.00906 | 0.004810 | 0.030471 |
+| Holdout, 2025–2026 | 1,101,653 | 8,588 | 0.6588 | 0.02117 | 0.007691 | 0.043867 |
+
+### Actual versus predicted payoff UPB
+
+| Split | Realized full-payoff UPB rate | Isotonic predicted rate | Predicted / actual payoff dollars |
+|---|---:|---:|---:|
+| Test, 2023–2024 | 0.442406% | 0.647545% | 1.464x |
+| Holdout, 2025–2026 | 0.849747% | 0.918625% | 1.081x |
+
+The model ranks loan-level payoff risk better in the later holdout than in the
+2023–2024 test period. Aggregate overprediction remains material in the test
+period, so the project emphasizes ranking, calibration, and aggregate
+payoff-UPB diagnostics rather than presenting XGBoost as a direct CPR forecast.
+
+## XGBoost rate-shock sensitivity and support audit
+
+The December 2024 base XGBoost scores reproduced exactly for all **68,057**
+active test loans. A PMMS-linked scenario diagnostic then changed lagged
+refinance incentive consistently with a parallel market-rate move:
+
+- A **−100 bp market-rate shock** increases refinance incentive by
+  1.0 percentage point.
+- A **+100 bp market-rate shock** decreases refinance incentive by
+  1.0 percentage point.
+
+| Market-rate shock | UPB-weighted isotonic full-payoff probability | Loans within training support | UPB within training support |
+|---|---:|---:|---:|
+| −100 bp | 1.1079% | 69.1% | 70.8% |
+| Base | 0.7497% | 55.3% | 59.5% |
+| +100 bp | 0.5721% | 44.5% | 50.1% |
+
+The predicted direction is economically consistent: falling market rates raise
+refinance incentive and predicted full-payoff probability. However, a material
+low-incentive portion of the December 2024 cohort lies outside the 2018–2021
+training range, especially under a rate increase.
+
+This is **not an implementation mistake**. It is a model-validation finding:
+the 2024 rate-lock-in cohort contains incentive values that were not fully
+represented during the 2018–2021 training period. Reporting the support
+boundary prevents untested extrapolation from being presented as a validated
+valuation output.
+
+Accordingly, XGBoost shock outputs are reported as bounded loan-level
+sensitivity diagnostics. They are not used as the primary source of CPR,
+price, WAL, duration, or convexity.
 
 ## Empirical prepayment curves
 
-For each market period, the project calculates balance-weighted monthly payoff rates across refinance-incentive buckets and annualizes them as CPR. The resulting empirical S-curves show that payoff speeds generally rise with refinance incentive, but the strength of the response differs by period.
+For each market period, the project calculates balance-weighted monthly payoff
+rates across refinance-incentive buckets and annualizes them into CPR-style
+assumptions. The cash-flow engine converts the annualized assumption to
+single-month mortality (SMM) for monthly principal projection.
 
-The 2023–2024 curve is flatter than the 2018–2021 curve over much of the positive-incentive range. This pattern is consistent with a lower observed refinance response during the rate-lock-in period. It does not, by itself, establish that borrower preferences changed: period differences may also reflect burnout, borrower composition, seasoning, market conditions, and data limitations. Thin incentive buckets are excluded from plotted curves to reduce the influence of noisy estimates.
+The resulting S-curves show that payoff speeds generally rise with refinance
+incentive, but the strength of the relationship differs by period.
+
+The 2023–2024 curve is flatter than the 2018–2021 curve over much of the
+positive-incentive range. This is consistent with lower observed refinance
+responsiveness during the rate-lock-in period. It does not establish that
+borrower preferences changed: period differences can also reflect burnout,
+seasoning, borrower composition, home-sales activity, servicing behavior,
+market conditions, and limits of public loan-level fields.
+
+Thin incentive buckets are excluded from plotted curves to reduce sensitivity
+to noisy estimates.
 
 ## Illustrative valuation assumptions
 
-> **Important interpretation:** The valuation outputs are scenario-analysis results for a hypothetical pass-through pool. They are not observed security prices, a market quote, a market-calibrated valuation, an OAS analysis, or an investment recommendation.
+> **Important interpretation:** The valuation outputs are scenario-analysis
+> results for a hypothetical pass-through pool. They are not observed security
+> prices, market quotes, market-calibrated valuations, OAS analyses, or
+> investment recommendations.
 
-The empirical curves are used to assign CPR assumptions under parallel rate shocks. CPR is converted to SMM, and the assumed prepayment speed is applied to a hypothetical pass-through pool to project monthly principal and interest cash flows. The analysis then calculates price per 100, weighted-average life, effective duration, and effective convexity.
+The empirical prepayment curves—not XGBoost probabilities—assign pool-level
+CPR-style assumptions under parallel rate shocks. These assumptions are
+converted to monthly SMM and applied to a hypothetical pass-through pool to
+project scheduled principal, prepayments, interest, price per 100, WAL,
+effective duration, and effective convexity.
 
-The results depend on the assumptions and conventions encoded in `valuation_baseline.py`, `valuation_empirical.py`, and the figure-generation scripts. In particular, the cash-flow engine uses a hypothetical pool, fixed coupon and discount-yield assumptions, empirical bucket-level CPR relationships, and simplified parallel rate shifts. Review those scripts before interpreting or reproducing the figures; do not treat their outputs as market-calibrated values.
+The results depend on assumptions and conventions in `valuation_baseline.py`,
+`valuation_empirical.py`, and figure-generation scripts. The cash-flow engine
+uses a hypothetical pool, fixed coupon and discount-yield assumptions,
+empirical incentive-bucket relationships, and simplified parallel rate shifts.
 
 For the 2023–2024 empirical curve, the `±100 bp` scenario produced:
 
-| Scenario | CPR | Price per 100 | WAL |
+| Scenario | Annualized payoff assumption | Price per 100 | WAL |
 |---|---:|---:|---:|
 | Rates −100 bp | 17.23% | 104.13 | 4.79 years |
 | Base case | 6.40% | 100.00 | 10.00 years |
 | Rates +100 bp | 3.97% | 91.98 | 12.42 years |
 
-At this shock size, the illustrative pool's effective duration is 6.07 years and its effective convexity is −3.89 under the convention used in the code. These figures describe this model setup only; they should not be generalized to a traded MBS or security.
+At this shock size, the illustrative pool's effective duration is **6.07 years**
+and its effective convexity is **−3.89** under the convention used in the code.
+These figures describe this model setup only and should not be generalized to
+a specific traded MBS or security.
 
-## Main findings
+## Comparing the approaches
 
-- Refinance incentive is associated with higher observed payoff speed, but the relationship varies across periods.
-- The 2023–2024 test period contains a much larger share of loans with negative refinance incentive than the training period.
-- Loan-level ranking is weaker in this out-of-time period, particularly among deeply out-of-the-money loans.
-- The empirical 2023–2024 S-curve implies lower CPR under rate rallies than the 2018–2021 curve, resulting in slower principal return and higher illustrative duration.
-- The XGBoost model is useful for studying loan-level risk, while the empirical S-curve is used for the current illustrative pool-level valuation scenarios because model probability calibration was not stable across periods.
+The project compares two complementary prepayment-analysis approaches, not two
+identical valuation engines.
+
+| Dimension | Empirical prepayment-curve approach | XGBoost payoff-risk approach |
+|---|---|---|
+| Unit of analysis | Balance-weighted pool/incentive bucket | Individual loan-month |
+| Target | Observed payoff behavior annualized for CPR-style scenarios | One-month full-voluntary-payoff probability |
+| Main drivers | Refinance-incentive bucket and market regime | Incentive, lags, seasoning, burnout, calendar, and loan characteristics |
+| Validation | Historical curve behavior and cash-flow scenario plausibility | Chronological test/holdout metrics, calibration, and payoff-UPB forecast |
+| Rate-shock role | Annualized payoff assumption → SMM → cash-flow valuation | Directional payoff-risk sensitivity with feature-support audit |
+| Pool-level duration/convexity | Yes, illustrative empirical result | No, not reported as a final result |
+| Key limitation | Historical buckets mix borrower types | Full-payoff target and scenario support limit valuation use |
+
+The empirical approach provides a transparent, valuation-ready pool-level
+assumption. XGBoost adds loan-level payoff-risk ranking, probability
+diagnostics, actual-versus-predicted UPB analysis, and a stress-tested
+rate-sensitivity view.
+
+A future extension could combine the strengths of both approaches by modeling
+a total-prepayment target, generating scenario-consistent future mortgage-rate
+paths, refreshing path-dependent features monthly, and validating projected
+cash flows against relevant security or benchmark analytics.
 
 ## Repository structure
 
 ```text
 .
 ├── data/
-│   ├── raw/                 # Downloaded source data; not committed
-│   └── processed/           # Processed panels and development samples
-├── src/                     # Data preparation, features, and model scripts
+│   ├── raw/                         # Downloaded source data; not committed
+│   └── processed/                   # Processed panels and development samples
+├── src/                             # Data preparation, feature, and model scripts
 ├── outputs/
-│   ├── figures_final/        # Final charts and chart data
-│   ├── models/               # Saved models and metric tables, if generated
-│   ├── predictions/          # Loan-month predictions, if generated
-│   └── valuation_baseline/  # Empirical curves, cash flows, and scenario tables
+│   ├── figures_final/               # Final figures
+│   ├── model_scenario_eda/          # XGBoost scenario/support-audit outputs
+│   ├── models/                      # Saved models and metric tables
+│   ├── predictions/                 # Loan-month predictions
+│   ├── reports/
+│   │   └── model_validation/        # Model metrics and validation reports
+│   └── valuation_baseline/          # Empirical cash-flow and scenario outputs
+├── audit_xgb_rate_shock_support.py  # XGBoost base-score/support audit
 ├── make_final_figures.py
+├── make_model_diagnostics.py
+├── make_xgb_final_figures.py
+├── summarize_xgb_shock_support.py
 ├── valuation_baseline.py
 └── valuation_empirical.py
 ```
 
-Some directories shown above are created when running the workflow and may not be present in a fresh clone.
+Some directories are created when scripts run and may not be present in a
+fresh clone.
 
 ## Reproducing the analysis
 
-Run commands from the repository root. The dataset is not bundled with this repository, and exact input filenames and paths depend on the downloaded files and the settings in the scripts. Inspect each script's input/output path configuration before running.
+Run commands from the repository root. The dataset is not bundled with this
+repository, and exact raw-input locations depend on the downloaded data and
+script path settings.
 
-1. Clone the repository and change into its directory:
+1. Clone the repository and enter it:
 
    ```bash
    git clone https://github.com/parthkhandelwal9193/mbs-prepayment.git
    cd mbs-prepayment
    ```
 
-2. Create and activate a Python virtual environment:
+2. Create and activate a virtual environment:
 
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
    ```
 
-3. Install the project's dependencies. If a `requirements.txt` is present:
+3. Install dependencies:
 
    ```bash
    python -m pip install --upgrade pip
    python -m pip install -r requirements.txt
    ```
 
-   If no dependency file is present, inspect the imports in the scripts and install the required packages in the environment. Do not assume that a fresh environment is reproducible until the dependencies have been recorded.
+   If `requirements.txt` is absent or incomplete, inspect imports and record
+   the environment before claiming full reproducibility.
 
-4. Download the Freddie Mac loan-level data and PMMS rates from the official links above. Place the files in the paths expected by the preparation scripts; raw data are not included in this repository.
+4. Download Freddie Mac loan-level data and PMMS rates from the official
+   sources above. Place them in the locations expected by the scripts.
 
-5. Run the preparation, feature, and modeling scripts in the order required by their inputs. The exact sequence and command-line arguments are script-specific; inspect each script's `main` block and path settings. The core scripts include:
+5. Run the preparation and model pipeline after checking each script's paths:
 
-   ```text
-   src/prepare_pmms.py
-   src/build_panel.py
-   src/add_rate_features.py
-   src/build_hazard_sample.py
-   src/validate_features.py
-   src/train_xgboost_hazard.py
+   ```bash
+   python src/prepare_pmms.py
+   python src/build_panel.py
+   python src/add_rate_features.py
+   python src/build_hazard_sample.py
+   python src/validate_features.py
+   python src/train_xgboost_hazard.py
    ```
 
-6. Run the valuation scripts and figure-generation script only after their expected input files have been created:
+6. Generate empirical valuation outputs and final empirical figures:
 
    ```bash
    python valuation_baseline.py
@@ -182,14 +420,45 @@ Run commands from the repository root. The dataset is not bundled with this repo
    python make_final_figures.py
    ```
 
-   These commands assume the scripts use repository-relative paths and that all required inputs exist. Check each script before running; adjust commands if it requires arguments or different paths.
+7. Generate XGBoost diagnostic and support-audit outputs after model training
+   and prediction files exist:
 
-7. Compare regenerated outputs with the committed figures and tables. Model results can vary if source data, package versions, script settings, or random seeds differ.
+   ```bash
+   python make_model_diagnostics.py
+   python validate_model_payoff_upb.py
+   python audit_xgb_rate_shock_support.py
+   python summarize_xgb_shock_support.py
+   python make_xgb_final_figures.py
+   ```
 
-## Limitations
+8. Compare regenerated outputs with the saved figures and tables. Results can
+   change if source-data releases, package versions, model settings, or random
+   seeds differ.
 
-- The public loan-level data do not contain all household, property-market, or servicing information that can drive turnover-related payoffs.
-- Zero-balance code `01` includes prepaid or matured voluntary payoffs; it is not a pure refinance label.
-- The observed incentive-bucket curves combine loans with different characteristics and are not fully adjusted for borrower mix or loan seasoning.
-- The cash-flow engine is illustrative and is not calibrated to a specific traded security, market curve, spread, or OAS.
-- A production valuation model would require a more complete pool/security specification, market-consistent rate scenarios, validated prepayment forecasts, and benchmarking against observed security prices or market analytics.
+## Limitations and interpretation
+
+- Public Freddie Mac loan-level data do not contain all household,
+  property-market, transaction, credit, and servicing factors that can drive
+  turnover-related payoffs.
+- Zero-balance code `01` is “Prepaid or Matured (Voluntary Payoff),” not a
+  pure refinance label and not total CPR.
+- Empirical incentive buckets combine loans with different seasoning, credit,
+  geography, origination, borrower, and servicing characteristics. The curves
+  are descriptive, not fully causal estimates.
+- The empirical cash-flow engine uses a hypothetical pool, fixed
+  coupon/discount-yield assumptions, simplified parallel shocks, and
+  historical incentive/payoff relationships. It is not calibrated to a
+  specified security, yield curve, spread, option cost, or OAS.
+- XGBoost is validated as a one-month loan-level full-payoff model, not as a
+  total-CPR or security-pricing model.
+- The XGBoost rate-shock diagnostic changes lagged refinance incentive but
+  does not simulate a complete future rate path or refresh every
+  path-dependent borrower feature month by month.
+- The support audit identifies a material cohort share outside the XGBoost
+  training range under rate shocks. This is a validation result—not a mistake:
+  it prevents untested extrapolation from being represented as validated
+  valuation output.
+- A production MBS valuation model would require a complete pool/security
+  specification, market-consistent interest-rate paths, a validated
+  total-prepayment/termination model, partial-principal behavior, benchmark
+  pricing, and spread/OAS calibration.
